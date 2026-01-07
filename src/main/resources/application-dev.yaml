@@ -1,0 +1,22 @@
+# Development Profile - application-dev.yaml
+# Usage: Run with --spring.profiles.active=dev
+# This profile allows ADMIN to access customer checkout flow for testing
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/samah_store
+    username: postgres
+    password: Ahmad1234
+
+# Dev-specific settings
+app:
+  security:
+    # Allow ADMIN role to access customer checkout endpoints in dev mode
+    allow-admin-checkout: true
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
+    com.samah.store: debug
+

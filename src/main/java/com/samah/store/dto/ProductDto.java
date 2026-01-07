@@ -1,0 +1,9 @@
+package com.samah.store.dto;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+public record ProductDto(Long id, String name, String slug, String description,
+                         boolean active, boolean deleted, CategoryDto category,
+                         List<ProductImageDto> images, List<ProductVariantDto> variants) {}
+

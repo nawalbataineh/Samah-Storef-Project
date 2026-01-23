@@ -3,6 +3,7 @@ import { adminApi } from '../../services/adminApi';
 import { useToast } from '../../context/ToastContext';
 import AdminLayout from '../../components/layout/AdminLayout';
 import { Modal } from '../../components/ui/Modal';
+import AdminOrderCard from '../../components/admin/AdminOrderCard';
 import { Filter, Eye, Copy, Phone, Mail, MapPin } from 'lucide-react';
 
 const STATUS_LABELS = {
@@ -282,7 +283,8 @@ const AdminOrders = () => {
           </div>
         ) : (
           <>
-            <div className="bg-white rounded-2xl shadow-sm border border-brand-border overflow-x-auto">
+            {/* Desktop Table (hidden on small screens; visible md+) */}
+            <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-brand-border overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-brand-soft border-b border-brand-border">
                   <tr>
@@ -363,27 +365,46 @@ const AdminOrders = () => {
               </table>
             </div>
 
-            {totalPages > 1 && (
-              <div className="flex justify-center gap-2">
-                <button
-                  onClick={() => setPage(p => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="px-4 py-2 bg-white border border-brand-border rounded-lg disabled:opacity-50"
-                >
-                  السابق
-                </button>
-                <span className="px-4 py-2">صفحة {page + 1} من {totalPages}</span>
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="px-4 py-2 bg-white border border-brand-border rounded-lg disabled:opacity-50"
-                >
-                  التالي
-                </button>
-              </div>
-            )}
-          </>
-        )}
+            {/* Mobile Cards (visible on small screens < md) */}
+            <div className="block md:hidden">
+              {filteredOrders.map(order => (
+                <AdminOrderCard
+                  key={order.id}
+                  item={order}
+                  onView={() => openDetails(order)}
+                  onEdit={() => {/* optional edit handler if exists */}}
+                  onDelete={() => {/* optional delete handler if exists */}}
+                  employees={employees}
+                  assigningOrderId={assigningOrderId}
+                  updatingId={updatingId}
+                  STATUS_LABELS={STATUS_LABELS}
+                  onAssign={handleAssignEmployee}
+                  onUpdateStatus={handleStatusUpdate}
+                />
+              ))}
+            </div>
+
+             {totalPages > 1 && (
+               <div className="flex justify-center gap-2">
+                 <button
+                   onClick={() => setPage(p => Math.max(0, p - 1))}
+                   disabled={page === 0}
+                   className="px-4 py-2 bg-white border border-brand-border rounded-lg disabled:opacity-50"
+                 >
+                   السابق
+                 </button>
+                 <span className="px-4 py-2">صفحة {page + 1} من {totalPages}</span>
+                 <button
+                   onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                   disabled={page >= totalPages - 1}
+                   className="px-4 py-2 bg-white border border-brand-border rounded-lg disabled:opacity-50"
+                 >
+                   التالي
+                 </button>
+               </div>
+             )}
+           </>
+         )}
 
         {/* Order Details Modal */}
         {selectedOrder && (

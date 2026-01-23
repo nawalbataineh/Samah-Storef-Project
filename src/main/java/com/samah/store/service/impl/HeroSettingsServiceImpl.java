@@ -7,6 +7,7 @@ import com.samah.store.repository.HeroSettingsRepository;
 import com.samah.store.service.HeroSettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -15,18 +16,23 @@ public class HeroSettingsServiceImpl implements HeroSettingsService {
     private final HeroSettingsRepository heroSettingsRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public HeroSettingsResponseDto getPublicHero() {
-        HeroSettings settings = getOrCreateDefaultSettings();
+        // Use non-persisting fetch for public GET
+        HeroSettings settings = getExistingOrDefaultInMemorySettings();
         return toDto(settings);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public HeroSettingsResponseDto getAdminHero() {
-        HeroSettings settings = getOrCreateDefaultSettings();
+        // Admin GET should also not write to DB; return existing or in-memory default
+        HeroSettings settings = getExistingOrDefaultInMemorySettings();
         return toDto(settings);
     }
 
     @Override
+    @Transactional
     public HeroSettingsResponseDto updateHero(HeroSettingsRequestDto dto) {
         HeroSettings settings = getOrCreateDefaultSettings();
 
@@ -45,11 +51,10 @@ public class HeroSettingsServiceImpl implements HeroSettingsService {
     /**
      * Get the hero settings row, or create default if none exists.
      * This ensures we always have exactly one row (single-row settings pattern).
+     * This method WILL persist a default if none exists and is used by admin write flows.
      */
     private HeroSettings getOrCreateDefaultSettings() {
-        return heroSettingsRepository.findAll()
-                .stream()
-                .findFirst()
+        return heroSettingsRepository.findTopByOrderByIdAsc()
                 .orElseGet(() -> {
                     HeroSettings defaultSettings = new HeroSettings();
                     defaultSettings.setBadgeText("مجموعة جديدة");
@@ -60,6 +65,27 @@ public class HeroSettingsServiceImpl implements HeroSettingsService {
                     defaultSettings.setCtaLink("/products");
                     defaultSettings.setHeroImageUrl("/assets/heroImage.jpg");
                     return heroSettingsRepository.save(defaultSettings);
+                });
+    }
+
+    /**
+     * Non-persisting variant used by the public and admin read-only endpoints.
+     * If no persisted settings exist, return a default HERO object in-memory
+     * without calling repository.save(...) so we don't write during a read-only transaction.
+     */
+    private HeroSettings getExistingOrDefaultInMemorySettings() {
+        return heroSettingsRepository.findTopByOrderByIdAsc()
+                .orElseGet(() -> {
+                    HeroSettings defaultSettings = new HeroSettings();
+                    defaultSettings.setBadgeText("مجموعة جديدة");
+                    defaultSettings.setTitleLine1("أناقة عصرية");
+                    defaultSettings.setTitleLine2("بلمسة مميزة");
+                    defaultSettings.setDescription("اكتشفي تشكيلتنا المختارة بعناية من الأزياء العصرية التي تعكس ذوقك الراقي");
+                    defaultSettings.setCtaText("تسوّقي الآن");
+                    defaultSettings.setCtaLink("/products");
+                    defaultSettings.setHeroImageUrl("/assets/heroImage.jpg");
+                    // NOTE: intentionally NOT saved - returned only in-memory
+                    return defaultSettings;
                 });
     }
 
@@ -77,4 +103,3 @@ public class HeroSettingsServiceImpl implements HeroSettingsService {
         );
     }
 }
-

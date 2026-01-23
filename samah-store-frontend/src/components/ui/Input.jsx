@@ -18,6 +18,19 @@ export const Input = ({
     full: 'rounded-full',
   };
 
+  // Defensive: ensure any phone-widget specific props are not forwarded to the native input
+  // This prevents third-party phone components (if accidentally passed) from receiving props
+  const {
+    disablePhoneWidget, // our explicit flag
+    country,
+    defaultCountry,
+    dialCode,
+    onlyCountries,
+    preferredCountries,
+    flags,
+    ...nativeProps
+  } = props;
+
   return (
     <div className="w-full">
       {label && (
@@ -41,7 +54,7 @@ export const Input = ({
           }
           ${className}
         `}
-        {...props}
+        {...nativeProps}
       />
       {hint && !error && (
         <p className="text-charcoal-500 text-xs mt-1.5">{hint}</p>
@@ -54,4 +67,3 @@ export const Input = ({
 };
 
 export default Input;
-

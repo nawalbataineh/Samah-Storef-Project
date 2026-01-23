@@ -2,7 +2,8 @@
  * Image URL utilities for Samah Store
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+// IMPORTANT: default to empty string so production doesn't accidentally point to localhost
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 /**
  * Convert relative or absolute image URLs to full URLs
@@ -34,4 +35,3 @@ export const getImageUrlWithFallback = (url, fallback = '/placeholder.jpg') => {
   if (!url) return fallback;
   return getImageUrl(url);
 };
-

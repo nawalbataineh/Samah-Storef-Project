@@ -1,12 +1,23 @@
-import { Link, Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import AdminTopBar from '../../components/admin/AdminTopBar';
+import SidebarDrawer from '../../components/admin/SidebarDrawer';
+import AdminSidebar from '../../components/admin/AdminSidebar';
+import { useState } from 'react';
 
 const AdminLayout = ({ children }) => {
   const { logout } = useAuth();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const openDrawer = () => setDrawerOpen(true);
+  const closeDrawer = () => setDrawerOpen(false);
 
   return (
     <div className="min-h-screen bg-gray-50" dir="rtl">
-      <header className="bg-white shadow-sm border-b border-brand-border">
+      {/* Mobile TopBar */}
+      <AdminTopBar title="لوحة الإدارة" onOpenDrawer={openDrawer} />
+
+      <header className="bg-white shadow-sm border-b border-brand-border hidden lg:block">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <h1 className="text-xl font-bold text-brand-primary">لوحة الإدارة</h1>
@@ -20,56 +31,20 @@ const AdminLayout = ({ children }) => {
         </div>
       </header>
 
+      <SidebarDrawer open={drawerOpen} onClose={closeDrawer} fromRight={true}>
+        <div className="p-4">
+          <AdminSidebar onNavigate={closeDrawer} />
+        </div>
+      </SidebarDrawer>
+
       <div className="container mx-auto px-4 py-8">
         <div className="flex gap-6">
-          <aside className="w-64 bg-white rounded-2xl p-6 shadow-sm border border-brand-border h-fit">
-            <nav className="space-y-2">
-              <Link
-                to="/admin/dashboard"
-                className="block px-4 py-2 rounded-lg hover:bg-brand-soft transition text-brand-ink"
-              >
-                لوحة التحكم
-              </Link>
-              <Link
-                to="/admin/orders"
-                className="block px-4 py-2 rounded-lg hover:bg-brand-soft transition text-brand-ink"
-              >
-                الطلبات
-              </Link>
-              <Link
-                to="/admin/categories"
-                className="block px-4 py-2 rounded-lg hover:bg-brand-soft transition text-brand-ink"
-              >
-                الفئات
-              </Link>
-              <Link
-                to="/admin/products"
-                className="block px-4 py-2 rounded-lg hover:bg-brand-soft transition text-brand-ink"
-              >
-                المنتجات
-              </Link>
-              <Link
-                to="/admin/shipping-zones"
-                className="block px-4 py-2 rounded-lg hover:bg-brand-soft transition text-brand-ink"
-              >
-                مناطق الشحن
-              </Link>
-              <Link
-                to="/admin/coupons"
-                className="block px-4 py-2 rounded-lg hover:bg-brand-soft transition text-brand-ink"
-              >
-                الكوبونات
-              </Link>
-              <Link
-                to="/admin/users"
-                className="block px-4 py-2 rounded-lg hover:bg-brand-soft transition text-brand-ink"
-              >
-                المستخدمين
-              </Link>
-            </nav>
+          {/* Desktop Sidebar */}
+          <aside className="hidden lg:block w-64 bg-white rounded-2xl p-6 shadow-sm border border-brand-border h-fit">
+            <AdminSidebar />
           </aside>
 
-          <main className="flex-1">
+          <main className="flex-1 pb-20">
             {children || <Outlet />}
           </main>
         </div>
@@ -79,4 +54,3 @@ const AdminLayout = ({ children }) => {
 };
 
 export default AdminLayout;
-

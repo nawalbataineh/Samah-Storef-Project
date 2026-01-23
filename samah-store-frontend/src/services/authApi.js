@@ -1,8 +1,10 @@
 import api from './api';
 
 export const authApi = {
-  register: async (username, email, password) => {
-    const { data } = await api.post('/api/auth/register', { username, email, password });
+  register: async (username, email, password, phone) => {
+    const payload = { username, email, password };
+    if (phone !== undefined) payload.phone = phone;
+    const { data } = await api.post('/api/auth/register', payload);
     return data;
   },
 
@@ -21,4 +23,3 @@ export const authApi = {
     return data;
   },
 };
-

@@ -78,7 +78,15 @@ const ContactPage = () => {
                   </div>
                   <div>
                     <h4 className="font-bold mb-1">الهاتف</h4>
-                    <p className="text-gray-700" dir="ltr">+962 79 123 4567</p>
+                    <p className="text-gray-700">
+                      <a
+                        href="tel:+962785524816"
+                        style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}
+                        className="tabular-nums tracking-[0.06em] inline-block"
+                      >
+                        +962 785 524 816
+                      </a>
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">

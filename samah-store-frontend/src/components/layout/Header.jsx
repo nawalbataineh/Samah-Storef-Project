@@ -12,6 +12,7 @@ import Logo from '../Logo';
 
 // Navigation - single product store (scalable)
 const NAV_LINKS = [
+  { name: 'الصفحة الرئيسية', href: '/' },
   { name: 'جديد', href: '/products?sort=createdAt,desc', highlight: true },
   { name: 'المنتجات', href: '/products' },
   { name: 'عنّا', href: '/about' },
@@ -37,28 +38,23 @@ const Header = () => {
 
         {/* Main Header */}
         <div className="container-main">
-          <div className="flex items-center justify-between h-16 lg:h-[72px]">
-            
+          <div className="flex items-center justify-between h-16 lg:h-[72px] min-w-0">
+
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 -ml-2 text-charcoal-700 hover:text-berry-500 transition-colors"
+              className="lg:hidden p-2 ml-0 lg:-ml-2 text-charcoal-700 hover:text-berry-500 transition-colors"
               aria-label="Open menu"
             >
               <Menu className="w-5 h-5" strokeWidth={1.5} />
             </button>
 
             {/* Logo - Center on mobile, left on desktop */}
-            <Link 
-              to="/" 
-              className="flex-shrink-0 hover:opacity-80 transition-opacity text-charcoal-800"
+            <Link
+              to="/"
+              className="flex-shrink-0 max-w-[140px] sm:max-w-none w-auto hover:opacity-80 transition-opacity text-charcoal-800"
             >
-              <span className="hidden sm:block">
-                <Logo variant="header" />
-              </span>
-              <span className="sm:hidden">
-                <Logo variant="icon" />
-              </span>
+              <Logo variant="header" />
             </Link>
 
             {/* Desktop Navigation */}
@@ -81,7 +77,7 @@ const Header = () => {
             </nav>
 
             {/* Actions */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 min-w-0">
               {/* Search */}
               <button
                 onClick={() => setSearchOpen(!searchOpen)}
@@ -188,11 +184,11 @@ const Header = () => {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           {/* Backdrop */}
-          <div 
+          <div
             className="absolute inset-0 bg-charcoal-900/30 backdrop-blur-sm"
             onClick={() => setMobileMenuOpen(false)}
           />
-          
+
           {/* Menu Panel */}
           <div className="absolute top-0 right-0 bottom-0 w-full max-w-sm bg-ivory-100 animate-slide-in shadow-elevated">
             {/* Menu Header */}
@@ -269,7 +265,11 @@ const Header = () => {
               {/* Contact */}
               <div className="mt-8 p-4 bg-rose-100 rounded-xl">
                 <p className="text-xs text-charcoal-500 mb-1">تواصلي معنا</p>
-                <p className="text-sm font-medium text-charcoal-700">+962 79 123 4567</p>
+                <p className="text-sm font-medium text-charcoal-700">
+                  <a href="tel:+962785524816" style={{ direction: 'ltr', unicodeBidi: 'plaintext' }} className="inline-block">
+                    <span className="tabular-nums tracking-[0.06em]">+962 785 524 816</span>
+                  </a>
+                </p>
               </div>
             </div>
           </div>

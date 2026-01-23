@@ -32,14 +32,46 @@ const HeroSection = ({ heroData, loading }) => {
 
   const hero = heroData || fallback;
 
-  // Resolve image URL
-  const getHeroImageUrl = (url) => {
-    if (!url) return heroImageFallback;
-    if (url.startsWith('http')) return url;
-    // Relative path (e.g., /assets/heroImage.jpg or /uploads/...)
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-    return url.startsWith('/') ? `${baseUrl}${url}` : heroImageFallback;
-  };
+  // --- Image resolution + diagnostics & self-healing ---
+  // States to track resolved URL and whether fallback is active
+  const [resolvedUrl, setResolvedUrl] = useState(null);
+  const [fallbackActive, setFallbackActive] = useState(false);
+  const [warned, setWarned] = useState(false);
+
+  useEffect(() => {
+    // Reset on hero change
+    setFallbackActive(false);
+    setResolvedUrl(null);
+
+    const raw = hero.heroImageUrl;
+    if (!raw) {
+      setResolvedUrl(heroImageFallback);
+      return;
+    }
+
+    const candidate = getImageUrl(raw);
+    // DEV: always show candidate; in production ensure uploads are prefixed by VITE_API_BASE_URL
+    const isUploadsPath = raw.startsWith('/uploads') || raw.includes('/uploads/');
+    const candidateLooksRelativeToBackend = candidate.startsWith('/uploads');
+
+    // If backend-hosted uploads are referenced but API base is not set in production, fallback.
+    if (isUploadsPath && candidateLooksRelativeToBackend && !import.meta.env.DEV) {
+      if (!warned) {
+        console.warn('[Hero] Missing VITE_API_BASE_URL — falling back to local hero image for:', candidate);
+        setWarned(true);
+      }
+      setFallbackActive(true);
+      setResolvedUrl(heroImageFallback);
+      return;
+    }
+
+    // Otherwise use the resolved candidate URL (could be absolute or prefixed)
+    setResolvedUrl(candidate);
+    // Log for diagnostics in DEV only
+    if (import.meta.env.DEV) {
+      console.log('[Hero] heroImageUrl (raw):', raw, '-> resolved:', candidate, 'fallbackActive:', false);
+    }
+  }, [hero && hero.heroImageUrl]);
 
   if (loading) {
     return (
@@ -66,9 +98,9 @@ const HeroSection = ({ heroData, loading }) => {
   return (
     <section className="relative bg-ivory-100 overflow-hidden">
       <div className="container-main">
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 min-h-[600px] lg:min-h-[680px] items-center">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 min-h-[600px] md:min-h-[600px] lg:min-h-[680px] items-center">
           {/* Content */}
-          <div className="py-16 lg:py-20 order-2 lg:order-1">
+          <div className="py-8 sm:py-12 lg:py-20 order-2 lg:order-1">
             <div className="max-w-lg">
               {/* Badge */}
               <span className="inline-block text-xs tracking-[0.2em] uppercase text-berry-500 font-medium mb-6">
@@ -91,7 +123,7 @@ const HeroSection = ({ heroData, loading }) => {
 
               {/* CTAs */}
               <div className="flex flex-wrap gap-4">
-                <Link to={hero.ctaLink} className="btn-primary px-8 py-3.5 rounded-lg">
+                <Link to={hero.ctaLink} className="btn-primary px-8 py-3.5 rounded-lg w-full sm:w-auto text-center">
                   {hero.ctaText}
                   <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
                 </Link>
@@ -100,13 +132,35 @@ const HeroSection = ({ heroData, loading }) => {
           </div>
 
           {/* Image */}
-          <div className="relative order-1 lg:order-2 h-[380px] lg:h-full">
-            <div className="absolute inset-0 lg:inset-y-8 lg:-right-8 lg:left-0">
+          <div className="relative order-1 lg:order-2 aspect-[4/5] sm:aspect-[3/4] md:aspect-[4/3] lg:h-full lg:aspect-auto">
+            <div className="absolute inset-0 lg:inset-y-8 lg:-right-8 lg:left-0 overflow-hidden rounded-2xl shadow-sm">
               <img
-                src={getHeroImageUrl(hero.heroImageUrl)}
+                src={resolvedUrl || heroImageFallback}
                 alt="Samah Fashion Collection"
-                className="w-full h-full object-cover rounded-2xl"
+                className="w-full h-full object-cover object-center rounded-2xl"
+                loading="eager"
+                decoding="async"
+                onError={(e) => {
+                  // Avoid infinite loop — only switch to fallback once
+                  if (fallbackActive) return;
+                  setFallbackActive(true);
+                  // warn once in console
+                  if (!warned) {
+                    console.warn('[Hero] image failed to load, switching to fallback for URL:', e.currentTarget.src);
+                    setWarned(true);
+                  }
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = heroImageFallback;
+                }}
               />
+              {/* Subtle editorial gradient overlay to add depth and improve perceived contrast (very light, preserves brand colors) */}
+              <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-l from-black/8 via-transparent to-transparent" />
+              {/* DEV-only diagnostics: show raw/resolved/fallback state */}
+              {import.meta.env.DEV && (
+                <div className="mt-2 text-xs text-gray-500">
+                  raw: {String(hero.heroImageUrl || 'null')} — resolved: {String(resolvedUrl)} — fallback: {fallbackActive ? 'yes' : 'no'}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -159,13 +213,15 @@ const ProductSpotlight = ({ product, loading }) => {
               {/* Product Image */}
               <Link
                   to={`/products/${product.slug || product.id}`}
-                  className="group relative aspect-[4/5] bg-ivory-100 rounded-xl overflow-hidden"
+                  className="group relative aspect-[4/5] lg:aspect-product bg-ivory-100 rounded-xl overflow-hidden"
               >
                 {product.primaryImageUrl ? (
                     <img
                         src={getImageUrl(product.primaryImageUrl)}
                         alt={product.name}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                        loading="lazy"
+                        decoding="async"
                     />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-rose-100 to-ivory-100">
@@ -236,7 +292,7 @@ const NewArrivals = ({ products, loading }) => {
 
           {/* Products Grid */}
           {loading ? (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                 {[...Array(4)].map((_, i) => (
                     <div key={i} className="animate-pulse">
                       <div className="aspect-product bg-ivory-200 rounded-lg mb-4" />
@@ -246,7 +302,7 @@ const NewArrivals = ({ products, loading }) => {
                 ))}
               </div>
           ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                 {(products || []).slice(0, 8).map((product, index) => (
                     <div
                         key={product.id}
@@ -268,9 +324,9 @@ const NewArrivals = ({ products, loading }) => {
 // ══════════════════════════════════════════════════════════════════
 
 const BRAND_VALUES = [
-  { icon: Truck, title: 'شحن مجاني', desc: 'للطلبات فوق 50 دينار' },
+  { icon: Truck, title: 'توصيل سريع', desc: 'لكافة محافظات الأردن' },
   { icon: RefreshCw, title: 'معاينة وقياس', desc: 'بوجود المندوب' },
-  { icon: Shield, title: 'دفع آمن', desc: 'طرق دفع متعددة' },
+  { icon: Shield, title: 'الدفع عند الاستلام', desc: 'تفقدي الطلب قبل الدفع' }
 ];
 
 const BrandPromise = () => {
@@ -390,7 +446,7 @@ const HomePage = () => {
   }, [error]);
 
   return (
-      <div className="bg-ivory-100">
+      <div className="bg-ivory-100 pt-16">
         <HeroSection heroData={heroData} loading={heroLoading} />
         <ProductSpotlight product={featuredProduct} loading={loading} />
         <NewArrivals products={latestProducts} loading={loading} />

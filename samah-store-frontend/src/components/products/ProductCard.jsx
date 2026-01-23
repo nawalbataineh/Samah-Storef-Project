@@ -19,20 +19,25 @@ export const ProductCard = ({ product }) => {
       className="group block"
     >
       {/* Image Container */}
-      <div className="relative aspect-product overflow-hidden rounded-xl bg-ivory-100 mb-4">
+      <div className="relative aspect-[4/5] lg:aspect-product overflow-hidden rounded-2xl bg-ivory-100 mb-6 sm:mb-4 border border-charcoal-100 transition-transform">
         {/* Product Image */}
         {imageUrl ? (
           <img
             src={imageUrl}
             alt={product.name}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            onError={(e) => { e.target.style.display = 'none'; }}
+            className="w-full h-full object-cover object-[50%_20%] transition-transform duration-500 will-change-transform group-hover:scale-[1.03]"
+            loading="lazy"
+            decoding="async"
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder.jpg'; }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-rose-100 to-ivory-100">
-            <span className="font-serif text-3xl text-rose-300">S</span>
+            <span className="font-serif text-4xl text-rose-300">S</span>
           </div>
         )}
+
+        {/* Soft inner highlight to mimic premium printed frame (very subtle) */}
+        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-b from-white/8 via-transparent to-transparent" />
 
         {/* Sale Badge */}
         {isOnSale && (
@@ -49,7 +54,7 @@ export const ProductCard = ({ product }) => {
         )}
 
         {/* Hover Overlay */}
-        <div className="absolute inset-0 bg-charcoal-900/0 group-hover:bg-charcoal-900/5 transition-colors duration-300" />
+        <div className="absolute inset-0 bg-charcoal-900/0 group-hover:bg-charcoal-900/4 transition-colors duration-300" />
       </div>
 
       {/* Product Info */}
@@ -62,18 +67,18 @@ export const ProductCard = ({ product }) => {
         )}
 
         {/* Product Name */}
-        <h3 className="text-sm text-charcoal-700 leading-snug line-clamp-2 group-hover:text-berry-500 transition-colors">
+        <h3 className="text-sm md:text-base text-charcoal-700 leading-snug line-clamp-2 sm:line-clamp-none group-hover:text-berry-500 transition-colors break-words font-medium">
           {product.name}
         </h3>
 
         {/* Price */}
-        <div className="flex items-center gap-2 pt-1">
-          <span className="font-medium text-charcoal-800">
-            {price.toFixed(2)} د.أ
+        <div className="flex items-baseline gap-3 pt-1 flex-wrap">
+          <span className="font-medium text-charcoal-800 tabular-nums tracking-tight">
+            {price.toFixed(2)}&nbsp;د.أ
           </span>
           {isOnSale && (
-            <span className="text-sm text-charcoal-400 line-through">
-              {originalPrice.toFixed(2)} د.أ
+            <span className="text-sm text-charcoal-400 line-through tabular-nums">
+              {originalPrice.toFixed(2)}&nbsp;د.أ
             </span>
           )}
         </div>
@@ -83,4 +88,3 @@ export const ProductCard = ({ product }) => {
 };
 
 export default ProductCard;
-

@@ -33,40 +33,31 @@ const LOGO_CONFIG = {
 // Clean wordmark with optional subtle descriptor
 // ══════════════════════════════════════════════════════════════════
 
-const LogoHeader = ({ dark = false, showDescriptor = false }) => {
+const LogoHeader = ({ dark = false, showDescriptor = false, className = '' }) => {
   const color = dark ? '#FFFFFF' : '#2E2A2B';
   const mutedColor = dark ? 'rgba(255,255,255,0.5)' : '#6F6668';
 
   return (
-    <div className="select-none">
+    <div className={`select-none ${className}`}>
       {/* Wordmark */}
       <span
+        className="whitespace-nowrap font-serif font-normal uppercase leading-none"
         style={{
-          fontFamily: "'Playfair Display', Georgia, serif",
-          fontSize: LOGO_CONFIG.header.fontSize,
-          fontWeight: 400,
           letterSpacing: LOGO_CONFIG.header.letterSpacing,
           color: color,
-          textTransform: 'uppercase',
-          display: 'block',
-          lineHeight: 1,
         }}
       >
         samah
       </span>
-      
+
       {/* Optional descriptor */}
       {showDescriptor && (
         <span
+          className="font-sans uppercase block mt-1"
           style={{
-            fontFamily: "'Inter', sans-serif",
-            fontSize: LOGO_CONFIG.header.descriptorSize,
-            fontWeight: 400,
             letterSpacing: LOGO_CONFIG.header.descriptorSpacing,
             color: mutedColor,
-            textTransform: 'uppercase',
-            display: 'block',
-            marginTop: '4px',
+            fontSize: LOGO_CONFIG.header.descriptorSize,
           }}
         >
           Store
@@ -81,41 +72,17 @@ const LogoHeader = ({ dark = false, showDescriptor = false }) => {
 // Stacked version - readable, not tiny
 // ══════════════════════════════════════════════════════════════════
 
-const LogoFooter = ({ dark = false }) => {
+const LogoFooter = ({ dark = false, className = '' }) => {
   const color = dark ? '#FFFFFF' : '#2E2A2B';
   const mutedColor = dark ? 'rgba(255,255,255,0.45)' : '#6F6668';
 
   return (
-    <div className="select-none">
-      {/* Wordmark */}
-      <span
-        style={{
-          fontFamily: "'Playfair Display', Georgia, serif",
-          fontSize: LOGO_CONFIG.footer.fontSize,
-          fontWeight: 400,
-          letterSpacing: LOGO_CONFIG.footer.letterSpacing,
-          color: color,
-          textTransform: 'uppercase',
-          display: 'block',
-          lineHeight: 1,
-        }}
-      >
+    <div className={`select-none ${className}`}>
+      <span className="font-serif font-normal uppercase leading-none" style={{ letterSpacing: LOGO_CONFIG.footer.letterSpacing, color }}>
         samah
       </span>
-      
-      {/* Descriptor - always shown in footer */}
-      <span
-        style={{
-          fontFamily: "'Inter', sans-serif",
-          fontSize: LOGO_CONFIG.footer.descriptorSize,
-          fontWeight: 400,
-          letterSpacing: LOGO_CONFIG.footer.descriptorSpacing,
-          color: mutedColor,
-          textTransform: 'uppercase',
-          display: 'block',
-          marginTop: '5px',
-        }}
-      >
+
+      <span className="font-sans uppercase block mt-1" style={{ letterSpacing: LOGO_CONFIG.footer.descriptorSpacing, color: mutedColor, fontSize: LOGO_CONFIG.footer.descriptorSize }}>
         Store
       </span>
     </div>
@@ -127,14 +94,14 @@ const LogoFooter = ({ dark = false }) => {
 // Typographic only - first letter
 // ══════════════════════════════════════════════════════════════════
 
-const LogoIcon = ({ dark = false, size = 32 }) => {
+const LogoIcon = ({ dark = false, size = 32, className = '' }) => {
   const color = dark ? '#FFFFFF' : '#2E2A2B';
-  
+
   return (
-    <div 
-      className="select-none flex items-center justify-center"
-      style={{ 
-        width: size, 
+    <div
+      className={`select-none flex items-center justify-center ${className}`}
+      style={{
+        width: size,
         height: size,
       }}
     >
@@ -164,18 +131,19 @@ export default function Logo({
   dark = false,
   showDescriptor = false,
   size = 32,
+  className = ''
 }) {
   switch (variant) {
     case 'footer':
     case 'stacked':
-      return <LogoFooter dark={dark} />;
+      return <LogoFooter dark={dark} className={className} />;
     case 'icon':
     case 'monogram':
-      return <LogoIcon dark={dark} size={size} />;
+      return <LogoIcon dark={dark} size={size} className={className} />;
     case 'header':
     case 'primary':
     default:
-      return <LogoHeader dark={dark} showDescriptor={showDescriptor} />;
+      return <LogoHeader dark={dark} showDescriptor={showDescriptor} className={className} />;
   }
 }
 
@@ -183,4 +151,3 @@ export default function Logo({
 export { LogoHeader, LogoFooter, LogoIcon };
 export const LogoHorizontal = LogoHeader;
 export const LogoStacked = LogoFooter;
-

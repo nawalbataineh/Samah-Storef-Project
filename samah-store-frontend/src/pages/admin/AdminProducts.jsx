@@ -7,9 +7,11 @@ import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import { getImageUrl } from '../../utils/imageUtils';
 
 const AdminProducts = () => {
   const [products, setProducts] = useState([]);
+  const [expandedActionsId, setExpandedActionsId] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -45,6 +47,15 @@ const AdminProducts = () => {
   const [variants, setVariants] = useState([]);
   const [images, setImages] = useState([]);
   const [manageTab, setManageTab] = useState('variants'); // 'variants' | 'images'
+
+  // Bulk create state
+  const [bulkColors, setBulkColors] = useState(''); // comma separated
+  const [bulkSizes, setBulkSizes] = useState(''); // comma separated
+  const [bulkPrice, setBulkPrice] = useState('');
+  const [bulkStock, setBulkStock] = useState('');
+  const [bulkActive, setBulkActive] = useState(true);
+  const [bulkCreating, setBulkCreating] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
 
   // Variant modal
   const [showVariantModal, setShowVariantModal] = useState(false);
@@ -342,12 +353,34 @@ const AdminProducts = () => {
 
     try {
       setSubmitting(true);
+      // SKU logic: if empty, auto-generate from product slug/name + size + color
+      const base = (managingProduct?.slug || managingProduct?.name || 'product').toString().trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
+      const sizePart = variantFormData.size ? variantFormData.size.toString().trim().toLowerCase().replace(/\s+/g, '-') : '';
+      const colorPart = variantFormData.color ? variantFormData.color.toString().trim().toLowerCase().replace(/\s+/g, '-') : '';
+
+      let sku = variantFormData.sku ? variantFormData.sku.trim() : '';
+      if (!sku) {
+        // generate candidate
+        sku = [base, sizePart, colorPart].filter(Boolean).join('-');
+      }
+
+      // Ensure uniqueness among current variants for this product
+      const exists = variants.some(v => v.sku && v.sku.toLowerCase() === sku.toLowerCase() && (!editingVariant || v.id !== editingVariant.id));
+      if (exists) {
+        setVariantFormErrors({ ...variantFormErrors, sku: 'SKU موجود بالفعل لهذا المنتج' });
+        setSubmitting(false);
+        return;
+      }
+
+      // If SKU still empty (no base parts), keep null
+      const finalSku = sku || null;
+
       const payload = {
-        sku: variantFormData.sku || null,
+        sku: finalSku,
         size: variantFormData.size || null,
         color: variantFormData.color || null,
         price: parseFloat(variantFormData.price),
-        stockQuantity: parseInt(variantFormData.stockQuantity),
+        stockQuantity: parseInt(variantFormData.stockQuantity, 10),
         active: variantFormData.active,
       };
 
@@ -366,6 +399,87 @@ const AdminProducts = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Bulk create handler
+  const handleBulkCreate = async () => {
+    if (!managingProduct) return;
+    // parse inputs
+    const colors = (bulkColors || '').split(',').map(s => s.trim()).filter(Boolean);
+    const sizes = (bulkSizes || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (colors.length === 0 || sizes.length === 0) {
+      showToast('يرجى إدخال قيم لكلٍ من الألوان والمقاسات مفصولة بفواصل', 'error');
+      return;
+    }
+
+    // Build combinations
+    const combos = [];
+    for (const color of colors) {
+      for (const size of sizes) {
+        combos.push({ color, size });
+      }
+    }
+
+    // Filter out existing variants with same size+color
+    const toCreate = [];
+    const skipped = [];
+    const existingMap = new Set(variants.map(v => `${(v.color||'').trim().toLowerCase()}||${(v.size||'').trim().toLowerCase()}`));
+    for (const c of combos) {
+      const key = `${c.color.trim().toLowerCase()}||${c.size.trim().toLowerCase()}`;
+      if (existingMap.has(key)) {
+        skipped.push(`${c.color} / ${c.size}`);
+      } else {
+        toCreate.push(c);
+      }
+    }
+
+    if (toCreate.length === 0) {
+      showToast(`لا توجد تركيبات جديدة للإنشاء. تم تخطي ${skipped.length} تكرارات.`, 'info');
+      setBulkResult({ created: 0, skipped, failed: [] });
+      return;
+    }
+
+    if (!window.confirm(`سيتم إنشاء ${toCreate.length} مقاسات. المتابعة؟`)) return;
+
+    setBulkCreating(true);
+    const failures = [];
+    let created = 0;
+
+    for (const item of toCreate) {
+      // generate SKU
+      const base = (managingProduct?.slug || managingProduct?.name || managingProduct?.id || 'product').toString().trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
+      const colorPart = item.color.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
+      const sizePart = item.size.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
+      const skuCandidate = `${base}-${colorPart}-${sizePart}`;
+
+      const payload = {
+        sku: skuCandidate || null,
+        size: item.size || null,
+        color: item.color || null,
+        // keep null if the input is empty string; otherwise parse number (radix 10)
+        price: bulkPrice !== '' ? parseFloat(bulkPrice) : null,
+        stockQuantity: bulkStock !== '' ? parseInt(bulkStock, 10) : null,
+        active: !!bulkActive,
+      };
+
+      try {
+        await adminApi.createVariant(managingProduct.id, payload);
+        created += 1;
+      } catch (err) {
+        failures.push({ combo: `${item.color} / ${item.size}`, message: err.response?.data?.message || err.message });
+        // continue
+      }
+    }
+
+    // Refresh and show summary
+    await loadVariants(managingProduct.id);
+    setBulkResult({ created, skipped, failed: failures });
+    setBulkCreating(false);
+    const msgs = [];
+    if (created) msgs.push(`تم إنشاء ${created} مقاس`);
+    if (skipped.length) msgs.push(`تخطي ${skipped.length} تكرارات`);
+    if (failures.length) msgs.push(`${failures.length} فشل`);
+    showToast(msgs.join(' • '), failures.length ? 'error' : 'success');
   };
 
   const handleOpenDeleteVariant = (variant) => {
@@ -587,8 +701,55 @@ const AdminProducts = () => {
           </div>
         ) : (
           <>
+            {/* Mobile: stacked cards */}
+            <div className="space-y-4 sm:hidden">
+              {products.map((product) => (
+                <div key={product.id} className="bg-white border border-brand-border rounded-2xl p-4 flex items-start gap-4">
+                  <img
+                    src={getImageUrl(product.primaryImageUrl) || '/placeholder.jpg'}
+                    alt={product.name}
+                    className="w-24 h-28 object-cover rounded-xl flex-shrink-0"
+                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder.jpg'; }}
+                  />
+                  <div className="flex-1 text-right">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <h3 className="text-sm font-medium leading-snug truncate">{product.name}</h3>
+                        <p className="text-xs text-gray-600 mt-1 truncate">{product.categoryName || '-'}</p>
+                      </div>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${product.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                        {product.active ? 'نشط' : 'غير نشط'}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="text-sm font-semibold text-berry-500 tabular-nums">{product.minPrice ? `${product.minPrice} د.أ` : '-'}</div>
+                      <button
+                        onClick={() => setExpandedActionsId(expandedActionsId === product.id ? null : product.id)}
+                        aria-expanded={expandedActionsId === product.id}
+                        className="h-11 min-h-[44px] px-3 rounded-md bg-ivory-50 text-sm text-brand-ink flex items-center gap-2"
+                      >
+                        إجراءات
+                        <span className="leading-none">⋯</span>
+                      </button>
+                    </div>
+
+                    {expandedActionsId === product.id && (
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button onClick={() => handleOpenManage(product)} className="h-11 w-full bg-white border rounded-md text-sm">إدارة</button>
+                        <button onClick={() => handleOpenEditProduct(product)} className="h-11 w-full bg-white border rounded-md text-sm">تعديل</button>
+                        <button onClick={() => handleToggleProductStatus(product)} className="h-11 w-full bg-white border rounded-md text-sm">{product.active ? 'تعطيل' : 'تفعيل'}</button>
+                        <button onClick={() => handleOpenDeleteProduct(product)} className="h-11 w-full bg-white border rounded-md text-sm text-red-600">حذف</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop/tablet: existing table (hidden on small) */}
             <div className="bg-white rounded-2xl shadow-sm border border-brand-border overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto hidden sm:block">
                 <table className="w-full">
                   <thead className="bg-brand-soft border-b border-brand-border">
                     <tr>
@@ -607,58 +768,16 @@ const AdminProducts = () => {
                         <td className="px-6 py-4 text-sm">#{product.id}</td>
                         <td className="px-6 py-4 text-sm font-medium">{product.name}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{product.categoryName || '-'}</td>
-                        <td className="px-6 py-4 text-sm font-semibold text-berry-500">
-                          {product.minPrice ? `${product.minPrice} دينار` : '-'}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {product.variantCount || 0}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            product.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {product.active ? 'نشط' : 'غير نشط'}
-                          </span>
-                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-berry-500">{product.minPrice ? `${product.minPrice} دينار` : '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{product.variantCount || 0}</td>
+                        <td className="px-6 py-4"><span className={`px-3 py-1 rounded-full text-xs font-medium ${product.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{product.active ? 'نشط' : 'غير نشط'}</span></td>
                         <td className="px-6 py-4">
                           <div className="flex gap-2 flex-wrap">
-                            <button
-                              onClick={() => handleOpenManage(product)}
-                              className="text-sm text-purple-600 hover:underline disabled:opacity-50"
-                              disabled={togglingId === product.id}
-                            >
-                              إدارة
-                            </button>
-                            <button
-                              onClick={() => handleOpenEditProduct(product)}
-                              className="text-sm text-blue-600 hover:underline disabled:opacity-50"
-                              disabled={togglingId === product.id}
-                            >
-                              تعديل
-                            </button>
-                            <button
-                              onClick={() => handleToggleProductStatus(product)}
-                              className={`text-sm hover:underline disabled:opacity-50 ${
-                                product.active ? 'text-orange-600' : 'text-green-600'
-                              }`}
-                              disabled={togglingId === product.id}
-                            >
-                              {togglingId === product.id ? 'جاري...' : product.active ? 'تعطيل' : 'تفعيل'}
-                            </button>
-                            <button
-                              onClick={() => handleOpenDeleteProduct(product)}
-                              className="text-sm text-gray-600 hover:underline disabled:opacity-50"
-                              disabled={togglingId === product.id}
-                            >
-                              حذف
-                            </button>
-                            <button
-                              onClick={() => handleOpenPermanentDeleteProduct(product)}
-                              className="text-sm text-red-600 hover:underline font-semibold disabled:opacity-50"
-                              disabled={togglingId === product.id}
-                            >
-                              حذف نهائي
-                            </button>
+                            <button onClick={() => handleOpenManage(product)} className="text-sm text-purple-600 hover:underline disabled:opacity-50" disabled={togglingId === product.id}>إدارة المقاسات والألوان</button>
+                            <button onClick={() => handleOpenEditProduct(product)} className="text-sm text-blue-600 hover:underline disabled:opacity-50" disabled={togglingId === product.id}>تعديل</button>
+                            <button onClick={() => handleToggleProductStatus(product)} className={`text-sm hover:underline disabled:opacity-50 ${product.active ? 'text-orange-600' : 'text-green-600'}`} disabled={togglingId === product.id}>{togglingId === product.id ? 'جاري...' : product.active ? 'تعطيل' : 'تفعيل'}</button>
+                            <button onClick={() => handleOpenDeleteProduct(product)} className="text-sm text-gray-600 hover:underline disabled:opacity-50" disabled={togglingId === product.id}>حذف</button>
+                            <button onClick={() => handleOpenPermanentDeleteProduct(product)} className="text-sm text-red-600 hover:underline font-semibold disabled:opacity-50" disabled={togglingId === product.id}>حذف نهائي</button>
                           </div>
                         </td>
                       </tr>
@@ -669,31 +788,31 @@ const AdminProducts = () => {
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setPage(page - 1)}
-                  disabled={page === 0}
-                  size="small"
-                >
-                  السابق
-                </Button>
-                <span className="px-4 py-2 text-sm text-gray-600">
-                  صفحة {page + 1} من {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  onClick={() => setPage(page + 1)}
-                  disabled={page >= totalPages - 1}
-                  size="small"
-                >
-                  التالي
-                </Button>
-              </div>
-            )}
+             {totalPages > 1 && (
+               <div className="flex justify-center gap-2">
+                 <Button
+                   variant="outline"
+                   onClick={() => setPage(page - 1)}
+                   disabled={page === 0}
+                   size="small"
+                 >
+                   السابق
+                 </Button>
+                 <span className="px-4 py-2 text-sm text-gray-600">
+                   صفحة {page + 1} من {totalPages}
+                 </span>
+                 <Button
+                   variant="outline"
+                   onClick={() => setPage(page + 1)}
+                   disabled={page >= totalPages - 1}
+                   size="small"
+                 >
+                   التالي
+                 </Button>
+               </div>
+             )}
           </>
-        )}
+         )}
       </div>
 
       {/* Product Create/Edit Modal */}
@@ -826,7 +945,7 @@ const AdminProducts = () => {
       <Modal
         isOpen={showManageModal}
         onClose={handleCloseManageModal}
-        title={`إدارة: ${managingProduct?.name}`}
+        title={`إدارة المقاسات والألوان: ${managingProduct?.name}`}
       >
         <div className="space-y-4">
           {/* Tabs */}
@@ -856,6 +975,70 @@ const AdminProducts = () => {
           {/* Variants Tab */}
           {manageTab === 'variants' && (
             <div className="space-y-4">
+              {/* Bulk create section */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h3 className="text-sm font-medium mb-3">إضافة دفعة واحدة</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Input
+                    label="الألوان (مفصولة بفواصل)"
+                    value={bulkColors}
+                    onChange={(e) => setBulkColors(e.target.value)}
+                    placeholder="مثال: أحمر, أصفر, أسود"
+                  />
+                  <Input
+                    label="المقاسات (مفصولة بفواصل)"
+                    value={bulkSizes}
+                    onChange={(e) => setBulkSizes(e.target.value)}
+                    placeholder="مثال: S, M, L"
+                  />
+                  <Input
+                    label="السعر الافتراضي (اختياري)"
+                    value={bulkPrice}
+                    onChange={(e) => setBulkPrice(e.target.value)}
+                    placeholder="مثال: 50.00"
+                    type="number"
+                    step="0.01"
+                  />
+                  <Input
+                    label="الكمية الافتراضية (اختياري)"
+                    value={bulkStock}
+                    onChange={(e) => setBulkStock(e.target.value)}
+                    placeholder="مثال: 100"
+                    type="number"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3 mt-3">
+                  <input id="bulk-active" type="checkbox" checked={bulkActive} onChange={(e) => setBulkActive(e.target.checked)} className="w-4 h-4" />
+                  <label htmlFor="bulk-active" className="text-sm">نشط</label>
+                </div>
+
+                {/* Preview and action */}
+                <div className="flex items-center gap-3 mt-4 justify-between">
+                  <div className="text-sm text-gray-600">
+                    {(() => {
+                      const colors = (bulkColors||'').split(',').map(s=>s.trim()).filter(Boolean).length;
+                      const sizes = (bulkSizes||'').split(',').map(s=>s.trim()).filter(Boolean).length;
+                      const count = colors * sizes;
+                      return count > 0 ? `سيتم إنشاء ${count} مقاس` : 'أدخل الألوان والمقاسات للمعاينة';
+                    })()}
+                  </div>
+                  <div>
+                    <Button onClick={handleBulkCreate} disabled={bulkCreating || !managingProduct}>
+                      {bulkCreating ? 'جارٍ الإنشاء...' : 'إنشاء التركيبات'}
+                    </Button>
+                  </div>
+                </div>
+                {/* Result summary */}
+                {bulkResult && (
+                  <div className="mt-3 text-sm text-gray-700">
+                    {bulkResult.created ? <div>تم إنشاء: {bulkResult.created}</div> : null}
+                    {bulkResult.skipped && bulkResult.skipped.length ? <div>تخطي التكرارات: {bulkResult.skipped.join(', ')}</div> : null}
+                    {bulkResult.failed && bulkResult.failed.length ? <div className="text-red-600">فشل: {bulkResult.failed.map(f=>f.combo).join(', ')}</div> : null}
+                  </div>
+                )}
+              </div>
+
               <Button onClick={handleOpenCreateVariant} size="small">
                 إضافة مقاس
               </Button>
@@ -967,8 +1150,13 @@ const AdminProducts = () => {
           <Input
             label="SKU (اختياري)"
             value={variantFormData.sku}
-            onChange={(e) => setVariantFormData({ ...variantFormData, sku: e.target.value })}
+            onChange={(e) => {
+              setVariantFormData({ ...variantFormData, sku: e.target.value });
+              // clear SKU validation error when user edits
+              if (variantFormErrors?.sku) setVariantFormErrors({ ...variantFormErrors, sku: undefined });
+            }}
             placeholder="مثال: DRESS-S-RED"
+            error={variantFormErrors.sku}
             disabled={submitting}
           />
 

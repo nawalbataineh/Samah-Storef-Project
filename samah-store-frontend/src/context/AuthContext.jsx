@@ -30,6 +30,22 @@ export const AuthProvider = ({ children }) => {
       }
     }
     setLoading(false);
+
+    // Listen for global logout events (e.g., refresh failure from api client)
+    const handleGlobalLogout = () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('userInfo');
+      setIsAuthenticated(false);
+      setUser(null);
+      // redirect to login safely
+      try { window.location.href = '/login'; } catch (e) { /* noop */ }
+    };
+
+    window.addEventListener('samah_logout', handleGlobalLogout);
+
+    return () => {
+      window.removeEventListener('samah_logout', handleGlobalLogout);
+    };
   }, []);
 
   const login = async (usernameOrEmail, password) => {
@@ -50,8 +66,8 @@ export const AuthProvider = ({ children }) => {
     return response;
   };
 
-  const register = async (username, email, password) => {
-    const response = await authApi.register(username, email, password);
+  const register = async (username, email, password, phone) => {
+    const response = await authApi.register(username, email, password, phone);
 
     // Normalize and validate role
     const normalizedRole = normalizeRole(response.user?.role);
@@ -121,4 +137,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-

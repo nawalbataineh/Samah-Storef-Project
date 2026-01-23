@@ -289,6 +289,13 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Small-screen grid helper (360px - 639px) to support 2-column layout on compact phones */
+  @media (min-width: 360px) and (max-width: 639px) {
+    .grid-cols-2-xs {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -315,6 +322,3 @@
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
 }
-
-
-

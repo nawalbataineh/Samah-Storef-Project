@@ -87,7 +87,7 @@ const ProductsPage = () => {
   };
 
   return (
-    <div className="py-8">
+    <div className="py-8" data-ui="products-page-root">
       <Container>
         <SectionTitle>المنتجات</SectionTitle>
 
@@ -124,25 +124,34 @@ const ProductsPage = () => {
 
         <div className="flex gap-8">
           {/* Filters Sidebar */}
-          <div className={`${showFilters ? 'block' : 'hidden'} md:block w-full md:w-64 flex-shrink-0`}>
+          <div
+            className={`${showFilters ? 'fixed inset-0 z-50 bg-white overflow-y-auto' : 'hidden'} md:block w-full md:w-64 flex-shrink-0`}
+            data-ui="filters-drawer-root"
+          >
             <FiltersSidebar
               searchParams={searchParams}
               setSearchParams={setSearchParams}
               onFilterChange={() => setCurrentPage(0)}
             />
+            <button
+              onClick={() => setShowFilters(false)}
+              className="absolute top-4 right-4 text-gray-500"
+            >
+              إغلاق
+            </button>
           </div>
 
           {/* Products Grid */}
           <div className="flex-1">
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
                 {[...Array(12)].map((_, i) => (
                   <Skeleton key={i} className="h-80 rounded-2xl" />
                 ))}
               </div>
             ) : products.length > 0 ? (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
                   {products.map(product => (
                     <ProductCard key={product.id} product={product} />
                   ))}
@@ -169,4 +178,3 @@ const ProductsPage = () => {
 };
 
 export default ProductsPage;
-

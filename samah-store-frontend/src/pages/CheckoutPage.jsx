@@ -131,6 +131,8 @@ const CheckoutPage = () => {
     if (!addressFormData.city.trim()) errors.city = 'المدينة مطلوبة';
     if (!addressFormData.street.trim()) errors.street = 'الشارع مطلوب';
     if (!addressFormData.phone.trim()) errors.phone = 'رقم الهاتف مطلوب';
+    // New: only digits, length 6-15
+    else if (!/^[0-9]{6,15}$/.test(addressFormData.phone)) errors.phone = 'رقم الهاتف غير صالح';
     setAddressFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -438,9 +440,15 @@ const CheckoutPage = () => {
           <Input
             label="رقم الهاتف"
             value={addressFormData.phone}
-            onChange={(e) => setAddressFormData({ ...addressFormData, phone: e.target.value })}
+            onChange={(e) => {
+              // allow digits only
+              const digitsOnly = e.target.value.replace(/\D/g, '');
+              // enforce max length on input
+              setAddressFormData({ ...addressFormData, phone: digitsOnly.slice(0, 15) });
+            }}
             error={addressFormErrors.phone}
-            placeholder="مثال: 0791234567"
+            placeholder="رقم الهاتف"
+            type="tel"
           />
         </form>
       </Modal>

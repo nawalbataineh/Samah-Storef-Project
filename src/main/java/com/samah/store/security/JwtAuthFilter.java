@@ -2,6 +2,7 @@ package com.samah.store.security;
 
 import com.samah.store.domain.entites.User;
 import com.samah.store.repository.UserRepository;
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -49,6 +50,8 @@ public class JwtAuthFilter extends OncePerRequestFilter{
             var user = userRepository.findById(parsed.userId()).orElse(null);
             if (user == null || !user.isEnabled() || user.isDeleted()) {
                 log.warn("User not found or disabled for userId: {}", parsed.userId());
+                // ensure no stale authentication remains
+                SecurityContextHolder.clearContext();
                 chain.doFilter(request, response);
                 return;
             }
@@ -57,6 +60,7 @@ public class JwtAuthFilter extends OncePerRequestFilter{
             if (user.getTokenVersion() != parsed.tokenVersion()) {
                 log.warn("Token version mismatch for userId: {}. Expected: {}, Got: {}",
                     parsed.userId(), user.getTokenVersion(), parsed.tokenVersion());
+                SecurityContextHolder.clearContext();
                 chain.doFilter(request, response);
                 return;
             }
@@ -71,9 +75,15 @@ public class JwtAuthFilter extends OncePerRequestFilter{
             );
             SecurityContextHolder.getContext().setAuthentication(auth);
 
+        } catch (ExpiredJwtException eje) {
+            // Token expired: clear SecurityContext and continue filter chain (AuthenticationEntryPoint will return 401)
+            log.debug("JWT expired for request {} {}: {} (allowed clock skew applied)", request.getMethod(), request.getRequestURI(), eje.getMessage());
+            SecurityContextHolder.clearContext();
+            // do not set response here — continue filter chain so AuthenticationEntryPoint will return 401
         } catch (Exception e) {
-            log.error("JWT processing error: {}", e.getMessage());
             // invalid token => treat as unauthenticated
+            log.debug("JWT processing error: {}", e.getMessage());
+            SecurityContextHolder.clearContext();
         }
 
         chain.doFilter(request, response);
